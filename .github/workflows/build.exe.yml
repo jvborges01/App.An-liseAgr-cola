@@ -3,12 +3,12 @@ name: Build Windows Executable (PyInstaller)
 on:
   push:
     branches:
-      - main  # ou 'master', dependendo do seu branch principal
-  workflow_dispatch: # Permite execução manual na interface do GitHub
+      - main
+  workflow_dispatch:
 
 jobs:
   build-windows-exe:
-    runs-on: windows-latest # 👈 Usa a VM mais recente do Windows
+    runs-on: windows-latest
 
     steps:
       - name: Checkout code
@@ -17,27 +17,39 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10' # 👈 Use a versão do Python compatível com suas libs
+          python-version: '3.10'
 
       - name: Install Dependencies
         run: |
-          # 💡 É crucial instalar as libs geoespaciais na ordem correta, se necessário.
-          # Para garantir compatibilidade em ambientes CI/CD, o Conda/Miniconda é o mais robusto.
-          # No entanto, usaremos PIP aqui, pois geralmente funciona.
-          # (Você deve ter um arquivo requirements.txt listando todas as libs)
-          
-          # Se não tiver um requirements.txt, use a lista completa:
           python -m pip install --upgrade pip
           pip install pyinstaller numpy rasterio geopandas matplotlib scikit-image pandas Pillow
 
+      # ----------------------------------------------------
+      # 1. PASSO CORRIGIDO: CRIA O EXECUTÁVEL NA PASTA dist/
+      # ----------------------------------------------------
+      - name: Create Executable with PyInstaller
+        id: pyinstaller
+        # Usando a sintaxe em linha única para segurança no PowerShell
+        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
+
+      # ----------------------------------------------------
+      # 2. PASSO CORRIGIDO: UPLOAD PARA ARTIFACTS (OPCIONAL/DEBUG)
+      # ----------------------------------------------------
+      - name: Upload Executable to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Analise_Agricola_Windows_EXE
+          path: dist/AnáliseAgrícola.exe
+          retention-days: 7
+
+      # ----------------------------------------------------
+      # 3. PASSO CORRIGIDO: CRIA A RELEASE (SÓ RODA SE HOUVER TAG)
+      # ----------------------------------------------------
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v1
-        # Use o 'if' para garantir que roda apenas em tags (o que define uma versão)
         if: startsWith(github.ref, 'refs/tags/') 
         with:
-          # 🚨 VERIFIQUE E CONFIRME SE ESTE CAMINHO ESTÁ 100% CORRETO
           files: dist/AnáliseAgrícola.exe
-          
           tag_name: ${{ github.ref_name }} 
           name: Release ${{ github.ref_name }}
           body: |
@@ -45,12 +57,3 @@ jobs:
             - Atualizações de funcionalidades.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create Executable with PyInstaller
-        id: pyinstaller
-        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
-      - name: Upload Executable to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Analise_Agricola_Windows_EXE
-          path: dist/AnáliseAgrícola.exe
-          retention-days: 7 # O artefato fica disponível por 7 dias
