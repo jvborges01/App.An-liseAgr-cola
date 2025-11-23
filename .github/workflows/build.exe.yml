@@ -1,0 +1,53 @@
+name: Build Windows Executable (PyInstaller)
+
+on:
+  push:
+    branches:
+      - main  # ou 'master', dependendo do seu branch principal
+  workflow_dispatch: # Permite execução manual na interface do GitHub
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest # 👈 Usa a VM mais recente do Windows
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # 👈 Use a versão do Python compatível com suas libs
+
+      - name: Install Dependencies
+        run: |
+          # 💡 É crucial instalar as libs geoespaciais na ordem correta, se necessário.
+          # Para garantir compatibilidade em ambientes CI/CD, o Conda/Miniconda é o mais robusto.
+          # No entanto, usaremos PIP aqui, pois geralmente funciona.
+          # (Você deve ter um arquivo requirements.txt listando todas as libs)
+          
+          # Se não tiver um requirements.txt, use a lista completa:
+          python -m pip install --upgrade pip
+          pip install pyinstaller numpy rasterio geopandas matplotlib scikit-image pandas Pillow
+
+      - name: Create Executable with PyInstaller
+        id: pyinstaller
+        run: |
+          # 💡 O comando é executado no PowerShell (Windows), então não precisa de ^ ou \
+          # As flags --hidden-import e --collect-all são essenciais
+          pyinstaller --onefile --windowed --name "AnáliseAgrícola" ^
+            --hidden-import "matplotlib.backends.backend_tkagg" ^
+            --hidden-import "fiona" ^
+            --hidden-import "rasterio" ^
+            --hidden-import "gdal" ^
+            --collect-all "osgeo" ^
+            --collect-all "matplotlib" ^
+            --collect-all "geopandas" ^
+            main.py
+
+      - name: Upload Executable to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Analise_Agricola_Windows_EXE
+          path: dist/AnáliseAgrícola.exe
+          retention-days: 7 # O artefato fica disponível por 7 dias
