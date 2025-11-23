@@ -22,38 +22,15 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyinstaller numpy rasterio geopandas matplotlib scikit-image pandas Pillow
+          pip install pyinstaller numpy matplotlib scikit-image pandas Pillow
 
-      # ----------------------------------------------------
-      # 1. PASSO CORRIGIDO: CRIA O EXECUTÁVEL NA PASTA dist/
-      # ----------------------------------------------------
       - name: Create Executable with PyInstaller
-        id: pyinstaller
-        # Usando a sintaxe em linha única para segurança no PowerShell
-        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
+        run: |
+          pyinstaller --onefile --windowed --name "AnaliseAgricola" main.py
 
-      # ----------------------------------------------------
-      # 2. PASSO CORRIGIDO: UPLOAD PARA ARTIFACTS (OPCIONAL/DEBUG)
-      # ----------------------------------------------------
       - name: Upload Executable to Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Analise_Agricola_Windows_EXE
-          path: dist/AnáliseAgrícola.exe
+          path: dist/AnaliseAgricola.exe
           retention-days: 7
-
-      # ----------------------------------------------------
-      # 3. PASSO CORRIGIDO: CRIA A RELEASE (SÓ RODA SE HOUVER TAG)
-      # ----------------------------------------------------
-      - name: Create Release and Upload Asset
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/') 
-        with:
-          files: dist/AnáliseAgrícola.exe
-          tag_name: ${{ github.ref_name }} 
-          name: Release ${{ github.ref_name }}
-          body: |
-            Nova versão do Analisador Agrícola.
-            - Atualizações de funcionalidades.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
