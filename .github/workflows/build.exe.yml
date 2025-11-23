@@ -45,6 +45,9 @@ jobs:
             - Atualizações de funcionalidades.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create Executable with PyInstaller
+        id: pyinstaller
+        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
       - name: Upload Executable to Artifacts
         uses: actions/upload-artifact@v4
         with:
