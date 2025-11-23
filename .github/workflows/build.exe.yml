@@ -9,8 +9,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-windows-exe:
+  build-windows-exe: # 👈 Adicione as permissões aqui
     runs-on: windows-latest
+    permissions: # 👈 ESSENCIAL!
+      contents: write
 
     steps:
       - name: Checkout code
