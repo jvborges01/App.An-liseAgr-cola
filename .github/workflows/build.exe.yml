@@ -32,18 +32,7 @@ jobs:
 
       - name: Create Executable with PyInstaller
         id: pyinstaller
-        run: |
-          # 💡 O comando é executado no PowerShell (Windows), então não precisa de ^ ou \
-          # As flags --hidden-import e --collect-all são essenciais
-          pyinstaller --onefile --windowed --name "AnáliseAgrícola" ^
-            --hidden-import "matplotlib.backends.backend_tkagg" ^
-            --hidden-import "fiona" ^
-            --hidden-import "rasterio" ^
-            --hidden-import "gdal" ^
-            --collect-all "osgeo" ^
-            --collect-all "matplotlib" ^
-            --collect-all "geopandas" ^
-            main.py
+        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
 
       - name: Upload Executable to Artifacts
         uses: actions/upload-artifact@v4
