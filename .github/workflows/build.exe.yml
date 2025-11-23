@@ -30,10 +30,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller numpy rasterio geopandas matplotlib scikit-image pandas Pillow
 
-      - name: Create Executable with PyInstaller
-        id: pyinstaller
-        run: pyinstaller --onefile --windowed --name "AnáliseAgrícola" --hidden-import "matplotlib.backends.backend_tkagg" --hidden-import "fiona" --hidden-import "rasterio" --hidden-import "gdal" --collect-all "osgeo" --collect-all "matplotlib" --collect-all "geopandas" main.py
-
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v1
+        # Use o 'if' para garantir que roda apenas em tags (o que define uma versão)
+        if: startsWith(github.ref, 'refs/tags/') 
+        with:
+          # 🚨 VERIFIQUE E CONFIRME SE ESTE CAMINHO ESTÁ 100% CORRETO
+          files: dist/AnáliseAgrícola.exe
+          
+          tag_name: ${{ github.ref_name }} 
+          name: Release ${{ github.ref_name }}
+          body: |
+            Nova versão do Analisador Agrícola.
+            - Atualizações de funcionalidades.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Upload Executable to Artifacts
         uses: actions/upload-artifact@v4
         with:
