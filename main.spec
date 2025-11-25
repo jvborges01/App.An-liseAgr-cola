@@ -1,44 +1,29 @@
-# main.spec — robusto para Rasterio, GDAL, Shapely, GEOS, PROJ, Fiona, etc.
+# main.spec — robusto para GDAL, Rasterio, Fiona, Shapely, Geopandas
+# Funciona no GitHub Actions com Windows
 
-import sys
 import os
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_all
 
-# ───────────────────────────────────────────────
-# Dependências especiais
-# ───────────────────────────────────────────────
-datas  = []
+# Bibliotecas com dados extras
+datas = []
 binaries = []
 hiddenimports = []
 
-# Rasterio / GDAL / Fiona / PROJ / GEOS
-for pkg in ["rasterio", "fiona", "geopandas", "shapely", "pyproj"]:
-    datas += collect_data_files(pkg)
-    hiddenimports += collect_submodules(pkg)
+for pkg in ["rasterio", "fiona", "shapely", "pyproj", "geopandas"]:
+    collected = collect_all(pkg)
+    datas += collected["datas"]
+    binaries += collected["binaries"]
+    hiddenimports += collected["hiddenimports"]
 
-# GDAL runtime libs (Windows)
-gdal_data = os.environ.get("GDAL_DATA")
-if gdal_data:
-    datas.append((gdal_data, "gdal_data"))
-
-proj_data = os.environ.get("PROJ_LIB")
-if proj_data:
-    datas.append((proj_data, "proj_data"))
-
-# ───────────────────────────────────────────────
-# Configuração do executável
-# ───────────────────────────────────────────────
 block_cipher = None
 
 a = Analysis(
     ['main.py'],
-    pathex=[os.getcwd()],
+    pathex=['.'],
     binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
-    noarchive=False,
-    strip=False,
-    upx=False
+    noarchive=False
 )
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
@@ -49,16 +34,18 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name='AnaliseAgricola',
-    console=False
+    name='MeuPrograma',
+    debug=False,
+    strip=False,
+    upx=False
 )
 
 coll = COLLECT(
     exe,
     a.binaries,
-    a.zipfiles,
     a.datas,
+    a.zipfiles,
     strip=False,
     upx=False,
-    name='AnaliseAgricola'
+    name='build'
 )
