@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+# build.spec
 
 block_cipher = None
 
@@ -6,32 +6,21 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        ('C:/Program Files/GDAL', 'gdal_data'),
+        ('C:/Program Files/GDAL/gdalplugins', 'gdalplugins'),
+    ],
     hiddenimports=[
-        'rasterio',
+        'rasterio._env',
         'rasterio._shim',
-        'rasterio._base',
+        'rasterio._drivers',
+        'rasterio._features',
         'rasterio._io',
-        'rasterio.sample',
-        'rasterio.transform',
-        'rasterio.crs',
-        'fiona',
-        'fiona._shim',
-        'fiona.ogrext',
-        'matplotlib.backends.backend_tkagg',
+        'rasterio._warp'
     ],
 )
 
-# Coleta COMPLETA de libs GIS
-a.datas += collect_data_files('rasterio')
-a.binaries += collect_dynamic_libs('rasterio')
-
-a.datas += collect_data_files('fiona')
-a.binaries += collect_dynamic_libs('fiona')
-
-a.datas += collect_data_files('matplotlib')
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
+pyz = PYZ(a.pure)
 
 exe = EXE(
     pyz,
@@ -39,9 +28,6 @@ exe = EXE(
     a.binaries,
     a.zipfiles,
     a.datas,
-    name='AnaliseAgricola',
-    debug=False,
-    strip=False,
-    upx=False,
+    name='MeuPrograma',
     console=False,
 )
