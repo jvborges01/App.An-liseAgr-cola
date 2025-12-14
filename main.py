@@ -23,7 +23,7 @@ from datetime import datetime
 from PIL import Image, ImageTk 
 import io
 from pathlib import Path # Biblioteca para lidar com caminhos de forma robusta
-
+import tempfile
 # =========================
 # ARQUIVO DE CONFIGURAÇÃO
 # =========================
@@ -88,9 +88,11 @@ def get_recorte_data(dataset, geometry_list):
 # =========================
 # PLOTAGEM
 # =========================
-def gerar_plot_complexo(R_par, G_par, B_par, NIR_par, NDVI_par,
-                        RGB_contexto, extent_contexto,
-                        shp_contexto_gdf, shp_parcela_gdf, save_path=None):
+def gerar_plot_complexo(
+    R_par, G_par, B_par, NIR_par, NDVI_par,
+    RGB_contexto, extent_contexto,
+    shp_contexto_gdf, shp_parcela_gdf
+):
     
     # Mude a grade para 3 linhas e 6 colunas
     fig = plt.figure(figsize=(20, 12)) 
@@ -190,12 +192,13 @@ def gerar_plot_complexo(R_par, G_par, B_par, NIR_par, NDVI_par,
     # 2. SOBRESCREVE OS VALORES DE CENTRALIZAÇÃO (EXECUÇÃO FINAL)
     # left = 0.09 e right = 0.838 (Ajuste fino para a direita)
     fig.subplots_adjust(left=0.09, right=0.838, wspace=0.15, hspace=0.25) 
-    
-    if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
-        plt.close(fig)
-    else:
-        plt.show()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    buf.seek(0)
+    return Image.open(buf)
 
 def preparar_contexto(raster_obj, caminho_shp_contexto):
     try:
@@ -216,7 +219,8 @@ def preparar_contexto(raster_obj, caminho_shp_contexto):
         print("Erro preparar_contexto:", e)
         return None, None, None
 
-def processar_logica_geral(raster_path, shp_parcela_path, shp_contexto_path, save_path=None, show_plot=True):
+def processar_logica_geral(raster_path, shp_parcela_path, shp_contexto_path):
+
     try:
         raster = rasterio.open(raster_path)
     except Exception as e:
@@ -235,7 +239,13 @@ def processar_logica_geral(raster_path, shp_parcela_path, shp_contexto_path, sav
         NIR_est[np.isnan(Gp)] = np.nan
         NDVI[~np.isfinite(NDVI)] = np.nan
         gdf_par.filepath_or_buffer = shp_parcela_path 
-        gerar_plot_complexo(Rp, Gp, Bp, NIR_est, NDVI, rgb_ctx, extent_ctx, gdf_ctx, gdf_par, save_path=save_path)
+        imagem = gerar_plot_complexo(
+            Rp, Gp, Bp, NIR_est, NDVI,
+            rgb_ctx, extent_ctx,
+            gdf_ctx, gdf_par
+        )
+        return imagem
+        
 
 # =========================
 # GUI 
@@ -244,8 +254,8 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Sistema de Análise Agrícola - Mode 3")
-        self.geometry("560x480") 
-        self.resizable(False, False)
+        self.geometry("960x582") 
+        self.resizable(True, True)
         self.configure(bg='#0a0a0a') 
         
         self.FONT_FAMILY = "Inter"
@@ -441,9 +451,14 @@ class SettingsPage(Frame):
 
 class ManualPage(Frame):
     def __init__(self, parent, controller):
-        super().__init__(parent, style='TFrame')
+        super().__init__(parent)
         self.controller = controller
         
+        # Estado
+        self.is_processing = False
+        self.last_image = None
+        self.img_tk = None
+
         self.grid_columnconfigure(0, weight=1) 
         self.grid_columnconfigure(1, weight=1) 
         self.grid_columnconfigure(2, weight=1) 
@@ -460,21 +475,121 @@ class ManualPage(Frame):
         self.preview_label.grid(row=self.current_row, column=1, pady=30)
         self.current_row += 1 
         
-
+        # Variáveis
         self.v_shp_par = tk.StringVar()
         self.v_shp_ctx = tk.StringVar()
         self.v_rast = tk.StringVar()
         VAR_COLOR = '#6aa84f'
 
+        # Inputs
         self.build_input_group("Shapefile da Parcela (alvo - *.shp):", "Selecionar Parcela", self.v_shp_par, "shp_par", [("Shapefile", "*.shp")], VAR_COLOR)
         self.build_input_group("Shapefile de Contexto (Área Geral - *.shp):", "Selecionar Contexto", self.v_shp_ctx, "shp_ctx", [("Shapefile", "*.shp")], VAR_COLOR)
         self.build_input_group("Imagem TIFF (Mosaico/Ortofoto - *.tif/*.tiff):", "Selecionar TIFF", self.v_rast, "rast", [("Tiff", "*.tif *.tiff")], VAR_COLOR)
         
-        Button(self, text="Processar", style='Accent.TButton', 
-               command=self.run_manual, width=20).grid(row=self.current_row, column=1, pady=15, ipady=8)
-        self.current_row += 1
-        
 
+        # Observadores automáticos
+        self.v_shp_par.trace_add("write", self._on_inputs_changed)
+        self.v_shp_ctx.trace_add("write", self._on_inputs_changed)
+        self.v_rast.trace_add("write", self._on_inputs_changed)
+
+        
+        # Botões finais
+        Button(
+            self,
+            text="Visualizar imagem",
+            width=20,
+            command=self.mostrar_imagem
+        ).grid(row=self.current_row, column=1, pady=5)
+
+        self.current_row += 1
+
+        Button(
+            self,
+            text="Salvar imagem",
+            width=20,
+            command=self.salvar_imagem
+        ).grid(row=self.current_row, column=1, pady=10)
+        self.current_row += 1
+    def _build_input(self, label_text, var, filetypes):
+        Label(self, text=label_text).grid(
+            row=self.current_row,
+            column=0,
+            columnspan=3,
+            sticky="w",
+            padx=20
+        )
+
+        self.current_row += 1
+
+        Entry = tk.Entry(self, textvariable=var, width=40)
+        Entry.grid(row=self.current_row, column=0, columnspan=2, padx=20, pady=5)
+
+        Button(
+            self,
+            text="Selecionar",
+            command=lambda: self._select_file(var, filetypes)
+        ).grid(row=self.current_row, column=2, padx=10)
+
+        self.current_row += 1
+    def _select_file(self, var, filetypes):
+        path = filedialog.askopenfilename(filetypes=filetypes)
+        if path:
+            var.set(path)
+    def _on_inputs_changed(self, *args):
+        if self.is_processing:
+            return
+
+        if not all([
+            self.v_shp_par.get(),
+            self.v_shp_ctx.get(),
+            self.v_rast.get()
+        ]):
+            return
+
+        self.is_processing = True
+        self.after(100, self._processar_auto)
+    def _processar_auto(self):
+        try:
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            tmp.close()
+            self.last_image = processar_logica_geral(
+                self.v_rast.get(),
+                self.v_shp_par.get(),
+                self.v_shp_ctx.get(),
+            )
+
+        except Exception as e:
+            messagebox.showerror("Erro", f"Falha no processamento:\n{e}")
+
+        finally:
+            self.is_processing = False
+    def mostrar_imagem(self):
+        if not self.last_image:
+            messagebox.showinfo("Aviso", "Nenhuma imagem para visualizar.")
+            return
+
+        top = tk.Toplevel(self)
+        top.title("Resultado da Análise")
+        top.geometry("900x700")
+
+        img = self.last_image.copy()
+        img.thumbnail((850, 650), Image.LANCZOS)
+
+        self._img_tk = ImageTk.PhotoImage(img)
+        Label(top, image=self._img_tk).pack(expand=True)
+    def salvar_imagem(self):
+        if not self.last_image:
+            messagebox.showwarning("Aviso", "Nenhuma imagem gerada.")
+            return
+
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".png",
+            filetypes=[("PNG", "*.png"), ("JPEG", "*.jpg")]
+        )
+
+        if save_path:
+            self.last_image.save(save_path)
+            messagebox.showinfo("Sucesso", "Imagem salva com sucesso.")
     def update_tif_preview(self):
         shp_par_path = self.v_shp_par.get()
         shp_ctx_path = self.v_shp_ctx.get()
@@ -534,6 +649,8 @@ class ManualPage(Frame):
                 
                 self.img_tk = tk_img 
                 self.preview_label.config(image=self.img_tk, text="", style='TLabel')
+                preview_path = os.path.join("temp", "preview.png")
+                fig.savefig(preview_path, dpi=150, bbox_inches="tight")
                 
         except Exception as e:
             msg = f"Erro: {str(e)}"
@@ -542,7 +659,7 @@ class ManualPage(Frame):
 
     def build_input_group(self, label_text, button_text, var_control, dir_key, filetypes, var_color):
         row = self.current_row 
-        Label(self, text=label_text).grid(row=row, column=0, columnspan=3, pady=(5,0)) 
+        Label(self, text=label_text).grid(row=row, column=0, columnspan=2, pady=(5,0)) 
         row += 1
 
         def open_dialog(target_var=var_control, key=dir_key):
@@ -590,25 +707,28 @@ class ManualPage(Frame):
         shp_par = self.v_shp_par.get()
         shp_ctx = self.v_shp_ctx.get()
         rast = self.v_rast.get()
+
         if not all([shp_par, shp_ctx, rast]):
             messagebox.showwarning("Aviso", "Preencha os 3 campos antes de processar.")
             return
+
         try:
-            self.controller.update_idletasks() 
-            processar_logica_geral(rast, shp_par, shp_ctx, save_path=None, show_plot=True)
-            
-            # SALVAR O DIRETÓRIO APENAS APÓS O SUCESSO (Salvar o arquivo escolhido como último)
-            if self.controller.settings.get("remember_last_dir", True):
-                # Atualiza explicitamente o last_dir com os arquivos usados
-                self.controller.update_last_dir("shp_par", shp_par)
-                self.controller.update_last_dir("shp_ctx", shp_ctx)
-                self.controller.update_last_dir("rast", rast)
-                self.controller.save_settings()
+            self.controller.update_idletasks()
+
+            imagem = processar_logica_geral(
+                rast,
+                shp_par,
+                shp_ctx
+            )
+
+            # Guarda imagem em memória
+            self.last_image = imagem
+
+            # Mostra automaticamente
+            self.mostrar_imagem(imagem)
 
         except Exception as e:
-            print("--- ERRO MANUAL ---")
-            print(traceback.format_exc())
-            messagebox.showerror("Erro", f"Falha no processamento manual:\n{e}")
+            messagebox.showerror("Erro", str(e))
 
 class AutomaticPage(Frame):
     def __init__(self, parent, controller):
