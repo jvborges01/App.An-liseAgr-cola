@@ -5,12 +5,14 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
 
     steps:
-
     - name: Checkout
       uses: actions/checkout@v4
 
@@ -19,7 +21,7 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Install dependencie
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip wheel setuptools
         pip install -r requirements.txt
@@ -27,15 +29,15 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller main.spec --clean --noconfirm
+        pyinstaller main.spec --clean
 
     - name: Compress output
       run: |
-        $folder = Get-ChildItem dist | Select-Object -First 1
-        Compress-Archive -Path ("dist/" + $folder.Name) -DestinationPath build-output.zip
+        Compress-Archive `
+          -Path dist/* `
+          -DestinationPath AnaliseAgricola-Windows.zip
 
-    - name: Upload EXE as Artifact
-      uses: actions/upload-artifact@v4
+    - name: Create GitHub Release and upload asset
+      uses: softprops/action-gh-release@v2
       with:
-        name: build-output
-        path: build-output.zip
+        files: AnaliseAgricola-Windows.zip
