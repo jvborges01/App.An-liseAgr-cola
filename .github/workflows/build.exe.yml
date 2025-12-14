@@ -27,7 +27,7 @@ jobs:
 
     - name: Build EXE
       run: |
-        pyinstaller main.spec --clean
+        pyinstaller main.spec --clean --noconfirm
 
     - name: Compress output
       run: |

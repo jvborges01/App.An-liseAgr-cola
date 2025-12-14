@@ -1,31 +1,20 @@
-# main.spec — robusto para Rasterio, GDAL, Shapely, GeoPandas
+# main.spec — Windows-safe para GeoPandas / Rasterio / Fiona / Shapely
 
-# IMPORTANTE:
-# Rode sempre com:
-#   pyinstaller main.spec
-
-import os
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
-
-# Coleta automática de datas/libs importantes
-datas  = collect_data_files("rasterio")
-datas += collect_data_files("fiona")
-datas += collect_data_files("geopandas")
-datas += collect_data_files("shapely")
-datas += collect_data_files("pyproj")
-
-# Alguns pacotes precisam que módulos internos sejam incluídos
-hiddenimports  = collect_submodules("rasterio")
-hiddenimports += collect_submodules("fiona")
-hiddenimports += collect_submodules("geopandas")
-hiddenimports += collect_submodules("shapely")
-hiddenimports += collect_submodules("pyproj")
+from PyInstaller.utils.hooks import collect_submodules, collect_data_files
 
 block_cipher = None
 
+hiddenimports = []
+datas = []
+
+# Coleta completa dos pacotes geoespaciais
+for pkg in ("geopandas", "shapely", "fiona", "pyproj", "rasterio"):
+    hiddenimports += collect_submodules(pkg)
+    datas += collect_data_files(pkg)
+
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
@@ -52,7 +41,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,    # troque para False se NÃO quiser console
+    console=True,  # False se quiser ocultar console
 )
 
 coll = COLLECT(
