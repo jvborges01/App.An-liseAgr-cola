@@ -28,15 +28,6 @@ A aplicação tem como objetivo fornecer uma forma estruturada de processar, ana
 
 ---
 
-## 📁 Estrutura do Projeto
-
-```plaintext
-├── src/              # Código-fonte principal
-├── data/             # Dados utilizados (se houver)
-├── tests/            # Testes automatizados
-├── docs/             # Documentação adicional
-└── README.md         # Documentação do projeto
-```
 
 ## Como Executar
 
